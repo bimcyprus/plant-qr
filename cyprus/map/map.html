@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#917649">
+<meta name="description" content="Interactive resort map of Limak Cyprus Deluxe Hotel & Resort.">
+<title>Limak Cyprus Deluxe · Resort Map</title>
+
+<link rel="icon" href="limak.ico" type="image/x-icon">
+<link rel="apple-touch-icon" href="limak.ico">
+
+<style>
+  :root{
+    --bronze:#917649;
+    --bronze-2:#927549;
+    --bronze-dark:#6d5836;
+    --bronze-deep:#574627;
+    --beige:#e1d8c8;
+    --cream:#f8f6f2;
+    --white:#ffffff;
+    --ink:#4a3f2c;
+    --glass:rgba(255,255,255,.78);
+    --hairline:rgba(255,255,255,.30);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0;padding:0;height:100%;width:100%;overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(130% 90% at 50% -10%, var(--cream) 0%, #efe9df 48%, var(--beige) 100%);
+    -webkit-user-select:none;user-select:none;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ============ HEADER ============ */
+  header{
+    position:fixed;top:0;left:0;right:0;z-index:30;
+    display:flex;align-items:center;gap:13px;
+    padding:calc(env(safe-area-inset-top) + 11px) 18px 12px;
+    background:linear-gradient(135deg, var(--bronze) 0%, var(--bronze-dark) 100%);
+    box-shadow:0 4px 20px rgba(87,70,39,.28);
+  }
+  header::after{
+    content:"";position:absolute;left:0;right:0;bottom:0;height:2px;
+    background:linear-gradient(90deg, transparent, var(--beige) 25%, var(--white) 50%, var(--beige) 75%, transparent);
+    opacity:.7;
+  }
+  .logo-badge{
+    flex:0 0 auto;width:44px;height:44px;border-radius:50%;
+    background:var(--white);padding:5px;
+    box-shadow:0 4px 12px rgba(87,70,39,.30), inset 0 0 0 1px rgba(0,0,0,.04);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .logo-badge img{width:100%;height:100%;object-fit:contain;display:block;}
+  .titles{display:flex;flex-direction:column;line-height:1.18;min-width:0;}
+  .titles .brand{
+    font-size:16px;font-weight:800;letter-spacing:.6px;color:var(--white);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    text-shadow:0 1px 2px rgba(87,70,39,.4);
+  }
+  .titles .sub{
+    font-size:10.5px;font-weight:600;letter-spacing:2.4px;text-transform:uppercase;
+    color:var(--beige);margin-top:2px;
+  }
+
+  /* ============ MAP VIEWPORT ============ */
+  #viewport{
+    position:fixed;inset:0;
+    overflow:hidden;
+    touch-action:none;
+    cursor:grab;
+  }
+  #viewport.dragging{cursor:grabbing;}
+  #stage{
+    position:absolute;top:0;left:0;
+    transform-origin:0 0;
+    will-change:transform;
+  }
+  #stage.animate{transition:transform .28s cubic-bezier(.22,.61,.36,1);}
+  #map{
+    display:block;
+    pointer-events:none;
+    -webkit-user-drag:none;
+    border-radius:10px;
+    box-shadow:0 16px 50px rgba(87,70,39,.35), 0 0 0 1px rgba(145,118,73,.18);
+    background:#cfe6d2;
+    image-rendering:auto;
+  }
+
+  /* ============ CONTROLS ============ */
+  .controls{
+    position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom) + 20px);z-index:25;
+    display:flex;flex-direction:column;gap:11px;
+  }
+  .ctrl-btn{
+    width:52px;height:52px;border:1px solid var(--hairline);border-radius:16px;
+    background:var(--glass);color:var(--bronze-dark);
+    font-size:25px;font-weight:600;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 20px rgba(87,70,39,.25);
+    backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);
+    cursor:pointer;transition:transform .12s ease, background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .ctrl-btn:hover{background:var(--bronze);color:var(--white);border-color:var(--bronze-dark);}
+  .ctrl-btn:active{transform:scale(.88);}
+  .ctrl-btn svg{width:23px;height:23px;}
+  .ctrl-sep{height:1px;margin:1px 6px;background:rgba(145,118,73,.30);}
+
+  /* zoom level pill */
+  #zoomPill{
+    position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 78px);z-index:25;
+    transform:translate(-50%,-6px);
+    background:var(--bronze);color:var(--white);
+    font-size:13px;font-weight:700;letter-spacing:.5px;
+    padding:6px 14px;border-radius:30px;
+    box-shadow:0 4px 14px rgba(87,70,39,.35);
+    opacity:0;pointer-events:none;transition:opacity .35s ease, transform .35s ease;
+  }
+  #zoomPill.show{opacity:1;transform:translate(-50%,0);}
+
+  /* ============ HINT ============ */
+  #hint{
+    position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 26px);z-index:24;
+    transform:translateX(-50%);
+    background:linear-gradient(135deg, var(--bronze) 0%, var(--bronze-dark) 100%);
+    color:var(--white);
+    padding:11px 20px;border-radius:30px;
+    font-size:13px;letter-spacing:.3px;white-space:nowrap;
+    box-shadow:0 8px 24px rgba(87,70,39,.40);
+    display:flex;align-items:center;gap:9px;
+    transition:opacity .6s ease, transform .6s ease;
+  }
+  #hint b{color:var(--beige);font-weight:700;}
+  #hint.hide{opacity:0;transform:translate(-50%,16px);pointer-events:none;}
+  #hint svg{width:19px;height:19px;flex:0 0 auto;color:var(--beige);}
+
+  /* ============ LOADER ============ */
+  #loader{
+    position:fixed;inset:0;z-index:50;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
+    background:radial-gradient(130% 90% at 50% 25%, var(--cream) 0%, #efe9df 50%, var(--beige) 100%);
+    transition:opacity .55s ease;
+  }
+  #loader.hide{opacity:0;pointer-events:none;}
+  .loader-logo{
+    width:104px;height:104px;border-radius:50%;background:var(--white);padding:16px;
+    box-shadow:0 12px 40px rgba(87,70,39,.30);
+    animation:pop .6s cubic-bezier(.18,.89,.32,1.28) both;
+  }
+  .loader-logo img{width:100%;height:100%;object-fit:contain;}
+  @keyframes pop{0%{transform:scale(.5);opacity:0;}100%{transform:scale(1);opacity:1;}}
+  .loader-title{text-align:center;animation:fadeUp .6s ease .15s both;}
+  .loader-title .t1{font-size:19px;font-weight:800;letter-spacing:1.5px;color:var(--bronze-dark);}
+  .loader-title .t2{font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--bronze);margin-top:6px;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+  .bar{
+    width:170px;height:4px;border-radius:4px;overflow:hidden;
+    background:rgba(145,118,73,.22);
+  }
+  .bar span{
+    display:block;height:100%;width:40%;border-radius:4px;
+    background:linear-gradient(90deg,var(--bronze),var(--bronze-2));
+    animation:slide 1.1s ease-in-out infinite;
+  }
+  @keyframes slide{0%{transform:translateX(-110%);}100%{transform:translateX(330%);}}
+
+  /* ============ DESKTOP REFINEMENTS ============ */
+  @media (min-width:820px) and (pointer:fine){
+    .titles .brand{font-size:18px;}
+    #hint{font-size:14px;padding:12px 24px;}
+    .ctrl-btn{width:54px;height:54px;}
+  }
+  @media (min-width:820px){
+    body::after{
+      content:"";position:fixed;inset:0;pointer-events:none;z-index:10;
+      box-shadow:inset 0 0 200px 50px rgba(87,70,39,.12);
+    }
+  }
+</style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-badge"><img src="limak.ico" alt="Limak logo"></div>
+    <div class="titles">
+      <span class="brand">LIMAK CYPRUS DELUXE</span>
+      <span class="sub">Resort Map · Hotel Guide</span>
+    </div>
+  </header>
+
+  <div id="viewport">
+    <div id="stage">
+      <img id="map" src="limak-cyprus-map.png" alt="Limak Cyprus Deluxe Hotel resort map" draggable="false">
+    </div>
+  </div>
+
+  <div id="zoomPill">100%</div>
+
+  <div class="controls">
+    <button class="ctrl-btn" id="zoomIn" aria-label="Zoom in" title="Zoom in">+</button>
+    <button class="ctrl-btn" id="zoomOut" aria-label="Zoom out" title="Zoom out">−</button>
+    <div class="ctrl-sep"></div>
+    <button class="ctrl-btn" id="reset" aria-label="Reset view" title="Reset view">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9V5a2 2 0 0 1 2-2h4M21 9V5a2 2 0 0 0-2-2h-4M3 15v4a2 2 0 0 0 2 2h4M21 15v4a2 2 0 0 1-2 2h-4"/>
+      </svg>
+    </button>
+    <button class="ctrl-btn" id="fs" aria-label="Toggle fullscreen" title="Fullscreen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>
+      </svg>
+    </button>
+  </div>
+
+  <div id="hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 11V6a2 2 0 0 1 4 0v5M13 7a2 2 0 0 1 4 0v6a6 6 0 0 1-6 6h-1.5a4 4 0 0 1-3.3-1.8L4 14"/>
+    </svg>
+    <span id="hintText"><b>Pinch</b> or <b>double-tap</b> to zoom · drag to explore</span>
+  </div>
+
+  <div id="loader">
+    <div class="loader-logo"><img src="limak.ico" alt="Limak logo"></div>
+    <div class="loader-title">
+      <div class="t1">LIMAK CYPRUS DELUXE</div>
+      <div class="t2">Resort Map</div>
+    </div>
+    <div class="bar"><span></span></div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  var viewport = document.getElementById('viewport');
+  var stage    = document.getElementById('stage');
+  var img      = document.getElementById('map');
+  var loader   = document.getElementById('loader');
+  var hint     = document.getElementById('hint');
+  var pill     = document.getElementById('zoomPill');
+
+  var scale = 1, tx = 0, ty = 0;
+  var minScale = 1, maxScale = 8;   // maxScale is recomputed in fit() from native resolution
+  var baseW = 0, baseH = 0;         // displayed image size at scale 1 (fit)
+  var pillTimer = null;
+
+  function apply(){
+    stage.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+  }
+
+  function showPill(){
+    pill.textContent = Math.round((scale / minScale) * 100) + '%';
+    pill.classList.add('show');
+    clearTimeout(pillTimer);
+    pillTimer = setTimeout(function(){ pill.classList.remove('show'); }, 900);
+  }
+
+  function clamp(){
+    var vw = viewport.clientWidth, vh = viewport.clientHeight;
+    var w = baseW * scale, h = baseH * scale;
+    if (w <= vw){ tx = (vw - w) / 2; }
+    else { if (tx > 0) tx = 0; if (tx < vw - w) tx = vw - w; }
+    if (h <= vh){ ty = (vh - h) / 2; }
+    else { if (ty > 0) ty = 0; if (ty < vh - h) ty = vh - h; }
+  }
+
+  function fit(){
+    var vw = viewport.clientWidth, vh = viewport.clientHeight;
+    var natW = img.naturalWidth  || 5334;
+    var natH = img.naturalHeight || 7362;
+    var pad = (vw >= 820) ? 0.92 : 1;
+    var r = Math.min(vw / natW, vh / natH) * pad;
+    baseW = natW * r; baseH = natH * r;
+    img.style.width = baseW + 'px';
+    img.style.height = baseH + 'px';
+    // Allow zooming all the way to native pixels (and a touch beyond) so fine
+    // print like room numbers stays sharp. dpr ensures crispness on retina.
+    var dpr = window.devicePixelRatio || 1;
+    maxScale = Math.max(6, (natW / baseW) * Math.max(1.15, dpr));
+    scale = 1;
+    clamp(); apply();
+  }
+
+  function animateOn(){ stage.classList.add('animate'); }
+  function animateOff(){ stage.classList.remove('animate'); }
+
+  function zoomAt(cx, cy, newScale, smooth){
+    newScale = Math.max(minScale, Math.min(maxScale, newScale));
+    if (newScale === scale) return;
+    var sx = (cx - tx) / scale, sy = (cy - ty) / scale;
+    scale = newScale;
+    tx = cx - sx * scale; ty = cy - sy * scale;
+    clamp();
+    if (smooth){ animateOn(); requestAnimationFrame(function(){ apply(); }); setTimeout(animateOff, 300); }
+    else { apply(); }
+    showPill();
+  }
+
+  function center(){ return { x: viewport.clientWidth/2, y: viewport.clientHeight/2 }; }
+
+  /* ---- Buttons ---- */
+  document.getElementById('zoomIn').addEventListener('click', function(){ var c=center(); zoomAt(c.x,c.y,scale*1.7,true); });
+  document.getElementById('zoomOut').addEventListener('click', function(){ var c=center(); zoomAt(c.x,c.y,scale/1.7,true); });
+  document.getElementById('reset').addEventListener('click', function(){ animateOn(); fit(); showPill(); setTimeout(animateOff,300); });
+
+  /* ---- Fullscreen ---- */
+  var fsBtn = document.getElementById('fs');
+  fsBtn.addEventListener('click', function(){
+    var d = document;
+    if (!d.fullscreenElement && !d.webkitFullscreenElement){
+      var el = d.documentElement;
+      (el.requestFullscreen || el.webkitRequestFullscreen || function(){}).call(el);
+    } else {
+      (d.exitFullscreen || d.webkitExitFullscreen || function(){}).call(d);
+    }
+  });
+  if (!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)){
+    fsBtn.style.display = 'none';
+  }
+
+  /* ---- Wheel (desktop) ---- */
+  viewport.addEventListener('wheel', function(e){
+    e.preventDefault();
+    var rect = viewport.getBoundingClientRect();
+    var factor = e.deltaY < 0 ? 1.18 : 1/1.18;
+    zoomAt(e.clientX - rect.left, e.clientY - rect.top, scale * factor, false);
+  }, { passive:false });
+
+  /* ---- Pointer drag + pinch ---- */
+  var pointers = {};
+  var lastDist = 0;
+  var dragMoved = false, dragStart = null;
+
+  function pts(){ return Object.keys(pointers).map(function(k){return pointers[k];}); }
+
+  viewport.addEventListener('pointerdown', function(e){
+    viewport.setPointerCapture(e.pointerId);
+    pointers[e.pointerId] = { x:e.clientX, y:e.clientY };
+    dragMoved = false; dragStart = { x:e.clientX, y:e.clientY };
+    animateOff();
+    if (Object.keys(pointers).length === 2){
+      var p = pts();
+      lastDist = Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y);
+    }
+    viewport.classList.add('dragging');
+  });
+
+  viewport.addEventListener('pointermove', function(e){
+    if (!pointers[e.pointerId]) return;
+    var prev = pointers[e.pointerId];
+    pointers[e.pointerId] = { x:e.clientX, y:e.clientY };
+    var keys = Object.keys(pointers);
+    var rect = viewport.getBoundingClientRect();
+
+    if (keys.length === 1){
+      tx += e.clientX - prev.x; ty += e.clientY - prev.y;
+      if (Math.abs(e.clientX-dragStart.x)>4 || Math.abs(e.clientY-dragStart.y)>4) dragMoved = true;
+      clamp(); apply();
+    } else if (keys.length === 2){
+      var p = pts();
+      var dist = Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y);
+      var mid = { x:(p[0].x+p[1].x)/2 - rect.left, y:(p[0].y+p[1].y)/2 - rect.top };
+      if (lastDist > 0){ zoomAt(mid.x, mid.y, scale * (dist/lastDist), false); }
+      lastDist = dist; dragMoved = true;
+    }
+  });
+
+  function endPointer(e){
+    if (pointers[e.pointerId]) delete pointers[e.pointerId];
+    if (Object.keys(pointers).length < 2){ lastDist = 0; }
+    if (Object.keys(pointers).length === 0){ viewport.classList.remove('dragging'); }
+  }
+  viewport.addEventListener('pointerup', endPointer);
+  viewport.addEventListener('pointercancel', endPointer);
+
+  /* ---- Double-tap / double-click ---- */
+  var lastTap = 0;
+  viewport.addEventListener('pointerup', function(e){
+    var now = Date.now();
+    var rect = viewport.getBoundingClientRect();
+    if (now - lastTap < 300 && !dragMoved){
+      var x = e.clientX - rect.left, y = e.clientY - rect.top;
+      if (scale > minScale * 1.5){ animateOn(); fit(); showPill(); setTimeout(animateOff,300); }
+      else { zoomAt(x, y, Math.min(maxScale, 5), true); }   // strong zoom to read fine print
+    }
+    lastTap = now;
+  });
+
+  /* ---- Hint auto-hide ---- */
+  var hintTimer = setTimeout(function(){ hint.classList.add('hide'); }, 5000);
+  viewport.addEventListener('pointerdown', function(){
+    clearTimeout(hintTimer); hint.classList.add('hide');
+  }, { once:true });
+
+  /* ---- Init ---- */
+  function ready(){
+    fit();
+    loader.classList.add('hide');
+    setTimeout(function(){ loader.style.display = 'none'; }, 650);
+  }
+  if (img.complete && img.naturalWidth){ ready(); }
+  else { img.addEventListener('load', ready); }
+  img.addEventListener('error', function(){
+    loader.querySelector('.bar').style.display = 'none';
+    loader.querySelector('.loader-title').innerHTML =
+      '<div class="t1">Map could not be loaded</div><div class="t2">Please check your connection</div>';
+  });
+
+  window.addEventListener('resize', function(){
+    var prevScale = scale;
+    fit();
+    var c = center();
+    if (prevScale > 1) zoomAt(c.x, c.y, prevScale, false);
+  });
+})();
+</script>
+</body>
+</html>
